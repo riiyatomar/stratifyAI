@@ -495,7 +495,7 @@ const NewProjectPage = (() => {
 
       if (result.success) {
         Toast.success('All agents completed successfully! Project created.');
-        Sidebar.refresh();
+        await Sidebar.refresh();
 
         // Show success state briefly, then navigate
         setTimeout(() => {

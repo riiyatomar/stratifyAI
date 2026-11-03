@@ -1,9 +1,44 @@
 // ========================================
-// STRATIFY AI — Data Store (localStorage)
+// STRATIFY AI — Data Store (API-backed)
 // ========================================
+// Talks to the FastAPI backend at /api/*
+// Falls back to localStorage when the backend is unreachable.
 
 const Store = (() => {
+  // Configurable backend base: can be set via window.STRATIFY_API_URL or localStorage
+  function getApiBase() {
+    return window.STRATIFY_API_URL || localStorage.getItem('stratify_api_url') || '/api';
+  }
+
   const STORAGE_KEY = 'stratify_ai_data';
+  let _useApi = true;
+
+  // ---------- low-level helpers ----------
+
+  async function apiFetch(path, opts = {}) {
+    if (!_useApi) return null;
+    try {
+      const base = getApiBase().replace(/\/+$/, '');
+      const url = base.startsWith('http') ? `${base}${path}` : `${base}${path}`;
+      const res = await fetch(url, {
+        headers: { 'Content-Type': 'application/json', ...opts.headers },
+        ...opts,
+      });
+      if (!res.ok) {
+        const err = await res.text();
+        console.warn(`API ${opts.method || 'GET'} ${path} -> ${res.status}`, err);
+        return null;
+      }
+      if (res.status === 204) return true;
+      return await res.json();
+    } catch (e) {
+      console.warn('API unreachable, falling back to localStorage', e);
+      _useApi = false;
+      return null;
+    }
+  }
+
+  // ---------- localStorage fallback (offline resilient) ----------
 
   const defaultData = {
     projects: [],
@@ -21,149 +56,164 @@ const Store = (() => {
     },
   };
 
-  function load() {
+  function _lsLoad() {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) return { ...defaultData };
-      const data = JSON.parse(raw);
-      return { ...defaultData, ...data };
-    } catch (e) {
-      console.error('Store: Failed to load data', e);
-      return { ...defaultData };
-    }
+      return { ...defaultData, ...JSON.parse(raw) };
+    } catch { return { ...defaultData }; }
   }
 
-  function save(data) {
+  function _lsSave(data) {
     try {
       data.meta.lastUpdated = new Date().toISOString();
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-      return true;
-    } catch (e) {
-      console.error('Store: Failed to save data', e);
-      return false;
+    } catch (e) { console.error('Store: ls save failed', e); }
+  }
+
+  function generateId() {
+    return 'id_' + Date.now().toString(36) + '_' + Math.random().toString(36).substr(2, 6);
+  }
+
+  // ---- Projects ----
+
+  async function getProjects() {
+    if (_useApi) {
+      const data = await apiFetch('/projects');
+      if (data) return data;
     }
+    return _lsLoad().projects || [];
   }
 
-  function getData() {
-    return load();
+  async function getProject(id) {
+    if (_useApi) {
+      const data = await apiFetch(`/projects/${id}`);
+      if (data) return data;
+    }
+    const projects = _lsLoad().projects || [];
+    return projects.find(p => p.id === id) || null;
   }
 
-  // ---- Project CRUD ----
-
-  function getProjects() {
-    return load().projects || [];
-  }
-
-  function getProject(id) {
-    return getProjects().find(p => p.id === id) || null;
-  }
-
-  function createProject(projectData) {
-    const data = load();
+  async function createProject(projectData) {
+    if (_useApi) {
+      const data = await apiFetch('/projects', {
+        method: 'POST',
+        body: JSON.stringify(projectData),
+      });
+      if (data) return data;
+    }
+    const store = _lsLoad();
     const project = {
       id: generateId(),
-      status: 'requirements', // requirements | proposal | planning | active | completed
+      status: 'requirements',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      // Client info
       clientName: projectData.clientName || '',
       company: projectData.company || '',
       email: projectData.email || '',
-      // Requirements (from Business Analyst Agent)
       requirements: projectData.requirements || null,
-      // Proposal (from Pre-Sales Consultant Agent)
       proposal: projectData.proposal || null,
-      // Project Plan (from Project Manager Agent)
       plan: projectData.plan || null,
-      // Scope Control Log (from Scope Control Auditor Agent)
       scopeLog: [],
-      // Activity log
-      activityLog: [
-        {
-          id: generateId(),
-          type: 'created',
-          message: 'Project created',
-          agent: 'orchestrator',
-          timestamp: new Date().toISOString(),
-        }
-      ],
+      activityLog: [{ id: generateId(), type: 'created', message: 'Project created', agent: 'orchestrator', timestamp: new Date().toISOString() }],
     };
-
-    data.projects.unshift(project);
-    save(data);
+    store.projects.unshift(project);
+    _lsSave(store);
     return project;
   }
 
-  function updateProject(id, updates) {
-    const data = load();
-    const idx = data.projects.findIndex(p => p.id === id);
+  async function updateProject(id, updates) {
+    if (_useApi) {
+      const data = await apiFetch(`/projects/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(updates),
+      });
+      if (data) return data;
+    }
+    const store = _lsLoad();
+    const idx = store.projects.findIndex(p => p.id === id);
     if (idx === -1) return null;
-
-    data.projects[idx] = {
-      ...data.projects[idx],
-      ...updates,
-      updatedAt: new Date().toISOString(),
-    };
-
-    save(data);
-    return data.projects[idx];
+    store.projects[idx] = { ...store.projects[idx], ...updates, updatedAt: new Date().toISOString() };
+    _lsSave(store);
+    return store.projects[idx];
   }
 
-  function addProjectActivity(projectId, activity) {
-    const data = load();
-    const project = data.projects.find(p => p.id === projectId);
-    if (!project) return;
+  async function deleteProject(id) {
+    if (_useApi) {
+      const ok = await apiFetch(`/projects/${id}`, { method: 'DELETE' });
+      if (ok !== null) return;
+    }
+    const store = _lsLoad();
+    store.projects = store.projects.filter(p => p.id !== id);
+    _lsSave(store);
+  }
 
+  async function addProjectActivity(projectId, activity) {
+    if (_useApi) {
+      const data = await apiFetch(`/projects/${projectId}/activity`, {
+        method: 'POST',
+        body: JSON.stringify(activity),
+      });
+      if (data) return data;
+    }
+    const store = _lsLoad();
+    const project = store.projects.find(p => p.id === projectId);
+    if (!project) return;
     project.activityLog = project.activityLog || [];
-    project.activityLog.unshift({
-      id: generateId(),
-      timestamp: new Date().toISOString(),
-      ...activity,
-    });
-
+    project.activityLog.unshift({ id: generateId(), timestamp: new Date().toISOString(), ...activity });
     project.updatedAt = new Date().toISOString();
-    save(data);
+    _lsSave(store);
   }
 
-  function addScopeEntry(projectId, entry) {
-    const data = load();
-    const project = data.projects.find(p => p.id === projectId);
+  async function addScopeEntry(projectId, entry) {
+    if (_useApi) {
+      const data = await apiFetch(`/projects/${projectId}/scope`, {
+        method: 'POST',
+        body: JSON.stringify(entry),
+      });
+      if (data) return data;
+    }
+    const store = _lsLoad();
+    const project = store.projects.find(p => p.id === projectId);
     if (!project) return;
-
     project.scopeLog = project.scopeLog || [];
-    project.scopeLog.unshift({
-      id: generateId(),
-      timestamp: new Date().toISOString(),
-      ...entry,
-    });
-
+    project.scopeLog.unshift({ id: generateId(), timestamp: new Date().toISOString(), ...entry });
     project.updatedAt = new Date().toISOString();
-    save(data);
-  }
-
-  function deleteProject(id) {
-    const data = load();
-    data.projects = data.projects.filter(p => p.id !== id);
-    save(data);
+    _lsSave(store);
   }
 
   // ---- Settings ----
 
-  function getSettings() {
-    return load().settings;
+  async function getSettings() {
+    if (_useApi) {
+      const data = await apiFetch('/settings');
+      if (data) return data;
+    }
+    return _lsLoad().settings;
   }
 
-  function updateSettings(updates) {
-    const data = load();
-    data.settings = { ...data.settings, ...updates };
-    save(data);
-    return data.settings;
+  async function updateSettings(updates) {
+    if (_useApi) {
+      const data = await apiFetch('/settings', {
+        method: 'PUT',
+        body: JSON.stringify(updates),
+      });
+      if (data) return data;
+    }
+    const store = _lsLoad();
+    store.settings = { ...store.settings, ...updates };
+    _lsSave(store);
+    return store.settings;
   }
 
   // ---- Stats ----
 
-  function getStats() {
-    const projects = getProjects();
+  async function getStats() {
+    if (_useApi) {
+      const data = await apiFetch('/projects/stats');
+      if (data) return data;
+    }
+    const projects = _lsLoad().projects || [];
     return {
       total: projects.length,
       active: projects.filter(p => ['requirements', 'proposal', 'planning', 'active'].includes(p.status)).length,
@@ -177,40 +227,40 @@ const Store = (() => {
     };
   }
 
-  function getRecentActivity(limit = 10) {
-    const projects = getProjects();
+  async function getRecentActivity(limit = 10) {
+    if (_useApi) {
+      const data = await apiFetch(`/projects/recent-activity?limit=${limit}`);
+      if (data) return data;
+    }
+    const projects = _lsLoad().projects || [];
     const activities = [];
-
     projects.forEach(project => {
       (project.activityLog || []).forEach(activity => {
-        activities.push({
-          ...activity,
-          projectId: project.id,
-          projectName: project.clientName || project.company || 'Untitled',
-        });
+        activities.push({ ...activity, projectId: project.id, projectName: project.clientName || project.company || 'Untitled' });
       });
     });
-
     activities.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
     return activities.slice(0, limit);
   }
 
-  // ---- Helpers ----
-
-  function generateId() {
-    return 'id_' + Date.now().toString(36) + '_' + Math.random().toString(36).substr(2, 6);
+  function getData() {
+    return _lsLoad();
   }
 
   function clearAll() {
     localStorage.removeItem(STORAGE_KEY);
   }
 
-  // ---- Export seed data for demo ----
-  function seedDemoData() {
-    const data = load();
-    if (data.projects.length > 0) return; // Don't seed if data exists
+  async function seedDemoData() {
+    if (_useApi) {
+      const data = await apiFetch('/projects/seed', { method: 'POST' });
+      if (data) return;
+    }
+    // localStorage demo data fallback
+    const store = _lsLoad();
+    if (store.projects && store.projects.length > 0) return;
 
-    const demoProjects = [
+    store.projects = [
       {
         id: 'demo_1',
         status: 'active',
@@ -231,142 +281,30 @@ const Store = (() => {
           ],
           userTypes: ['Admin', 'HR Manager', 'Employee', 'Department Head'],
           constraints: ['Must integrate with existing SAP system', 'GDPR compliance required', 'Support 500+ concurrent users'],
-          risks: ['SAP integration complexity', 'Data migration from legacy system', 'Tight timeline for compliance requirements'],
+          risks: ['SAP integration complexity', 'Data migration from legacy system'],
           budgetRange: '$50,000 - $80,000',
           timeline: '4-6 months',
           rawInput: 'We need an employee management portal...',
         },
         proposal: {
-          problemStatement: 'NovaTech Solutions currently relies on disparate spreadsheets and manual processes for employee management, leading to inefficiencies, data inconsistencies, and compliance risks. The lack of a centralized system hampers real-time decision-making and creates bottlenecks in HR operations.',
-          solution: 'We propose building a modern, cloud-based Employee Management Portal that centralizes all HR operations into a single, intuitive platform with real-time analytics capabilities.',
+          problemStatement: 'NovaTech Solutions currently relies on disparate spreadsheets and manual processes for employee management, leading to inefficiencies and compliance risks.',
+          solution: 'We propose building a modern, cloud-based Employee Management Portal that centralizes all HR operations.',
           features: [
-            { name: 'Employee Onboarding Workflow', description: 'Automated onboarding process with document collection, task assignments, and progress tracking', priority: 'High', complexity: 'Medium', estimate: '3 weeks' },
-            { name: 'Real-time Analytics Dashboard', description: 'Interactive dashboard with KPIs, workforce metrics, and customizable reports', priority: 'High', complexity: 'High', estimate: '4 weeks' },
-            { name: 'Role-Based Access Control', description: 'Granular permissions system supporting Admin, HR, Employee, and Department Head roles', priority: 'Critical', complexity: 'Medium', estimate: '2 weeks' },
-            { name: 'Automated Reporting', description: 'Scheduled report generation with PDF/Excel export and email distribution', priority: 'Medium', complexity: 'Medium', estimate: '2 weeks' },
-            { name: 'Leave Management', description: 'Leave request, approval workflow, balance tracking, and calendar integration', priority: 'High', complexity: 'Low', estimate: '2 weeks' },
-            { name: 'Performance Reviews', description: 'Configurable review cycles, 360° feedback, and performance analytics', priority: 'Medium', complexity: 'High', estimate: '3 weeks' },
+            { name: 'Employee Onboarding Workflow', description: 'Automated onboarding process with document collection', priority: 'High', complexity: 'Medium', estimate: '3 weeks' },
+            { name: 'Real-time Analytics Dashboard', description: 'Interactive dashboard with KPIs', priority: 'High', complexity: 'High', estimate: '4 weeks' },
           ],
-          timeline: [
-            { phase: 'Discovery & Design', duration: '2 weeks', color: '#00d4ff' },
-            { phase: 'Core Development', duration: '8 weeks', color: '#7c3aed' },
-            { phase: 'Integration & Testing', duration: '4 weeks', color: '#10b981' },
-            { phase: 'UAT & Launch', duration: '2 weeks', color: '#f59e0b' },
-          ],
+          timeline: [{ phase: 'Core Development', duration: '8 weeks', color: '#7c3aed' }],
           costEstimate: { min: 55000, max: 75000, currency: 'USD' },
-          assumptions: [
-            'SAP provides API access for integration',
-            'Client provides test data for development',
-            'Hosting infrastructure managed by client',
-            'Content and branding assets provided by client',
-          ],
-          valueProposition: 'This solution will reduce HR administrative overhead by 60%, enable real-time workforce insights, and ensure full GDPR compliance — positioning NovaTech for scalable growth.',
           status: 'sent',
         },
-        plan: {
-          modules: [
-            {
-              id: 'mod_1',
-              name: 'Authentication & RBAC',
-              tasks: [
-                { id: 't1', name: 'Design auth flow', status: 'done', priority: 'critical', effort: 'Medium' },
-                { id: 't2', name: 'Implement JWT auth', status: 'done', priority: 'critical', effort: 'Medium' },
-                { id: 't3', name: 'Build RBAC middleware', status: 'in-progress', priority: 'critical', effort: 'High' },
-                { id: 't4', name: 'Role management UI', status: 'todo', priority: 'high', effort: 'Medium' },
-              ],
-            },
-            {
-              id: 'mod_2',
-              name: 'Analytics Dashboard',
-              tasks: [
-                { id: 't5', name: 'Design dashboard layout', status: 'done', priority: 'high', effort: 'Low' },
-                { id: 't6', name: 'Build chart components', status: 'in-progress', priority: 'high', effort: 'High' },
-                { id: 't7', name: 'Implement data aggregation API', status: 'todo', priority: 'high', effort: 'High' },
-                { id: 't8', name: 'Real-time WebSocket updates', status: 'todo', priority: 'medium', effort: 'High' },
-              ],
-            },
-            {
-              id: 'mod_3',
-              name: 'Employee Onboarding',
-              tasks: [
-                { id: 't9', name: 'Design onboarding workflow', status: 'todo', priority: 'high', effort: 'Low' },
-                { id: 't10', name: 'Build form components', status: 'todo', priority: 'high', effort: 'Medium' },
-                { id: 't11', name: 'Document upload system', status: 'todo', priority: 'medium', effort: 'Medium' },
-                { id: 't12', name: 'Email notifications', status: 'todo', priority: 'low', effort: 'Low' },
-              ],
-            },
-          ],
-          milestones: [
-            { name: 'Core Auth Complete', date: '2026-04-15', status: 'completed' },
-            { name: 'Dashboard MVP', date: '2026-05-01', status: 'in-progress' },
-            { name: 'Onboarding Ready', date: '2026-05-20', status: 'upcoming' },
-            { name: 'SAP Integration', date: '2026-06-10', status: 'upcoming' },
-            { name: 'UAT Launch', date: '2026-06-25', status: 'upcoming' },
-          ],
-        },
-        scopeLog: [
-          {
-            id: 'scope_1',
-            request: 'Can we add a chatbot for employee queries?',
-            classification: 'out-scope',
-            justification: 'A chatbot with NLP capabilities was not part of the original scope. This would require AI/ML integration, training data preparation, and additional development effort of approximately 4-6 weeks.',
-            impact: { time: '+4-6 weeks', cost: '+$15,000-$20,000' },
-            timestamp: new Date(Date.now() - 2 * 86400000).toISOString(),
-          },
-          {
-            id: 'scope_2',
-            request: 'Add leave balance to the analytics dashboard',
-            classification: 'in-scope',
-            justification: 'Leave management and analytics dashboard are both in the original scope. Displaying leave balance data as a dashboard widget is a natural extension of existing features.',
-            impact: { time: 'No additional time', cost: 'Included' },
-            timestamp: new Date(Date.now() - 3 * 86400000).toISOString(),
-          },
-        ],
-        activityLog: [
-          { id: 'a1', type: 'scope', message: 'Scope evaluation: "Add chatbot" classified as Out of Scope', agent: 'auditor', timestamp: new Date(Date.now() - 2 * 86400000).toISOString() },
-          { id: 'a2', type: 'task', message: 'Task "Build chart components" moved to In Progress', agent: 'planner', timestamp: new Date(Date.now() - 3 * 86400000).toISOString() },
-          { id: 'a3', type: 'proposal', message: 'Proposal sent to client', agent: 'consultant', timestamp: new Date(Date.now() - 4 * 86400000).toISOString() },
-          { id: 'a4', type: 'analysis', message: 'Requirements analysis completed with 6 features extracted', agent: 'analyst', timestamp: new Date(Date.now() - 5 * 86400000).toISOString() },
-          { id: 'a5', type: 'created', message: 'Project created', agent: 'orchestrator', timestamp: new Date(Date.now() - 5 * 86400000).toISOString() },
-        ],
-      },
-      {
-        id: 'demo_2',
-        status: 'proposal',
-        clientName: 'Sarah Williams',
-        company: 'GreenLeaf Organics',
-        email: 'sarah@greenleaf.com',
-        createdAt: new Date(Date.now() - 2 * 86400000).toISOString(),
-        updatedAt: new Date(Date.now() - 86400000).toISOString(),
-        requirements: {
-          objective: 'E-commerce platform for organic food delivery with subscription model',
-          features: [
-            'Product catalog with categories',
-            'Subscription box management',
-            'Payment gateway integration',
-            'Delivery tracking',
-            'Customer reviews & ratings',
-          ],
-          userTypes: ['Customer', 'Admin', 'Delivery Partner'],
-          constraints: ['Launch within 3 months', 'PCI-DSS compliance for payments', 'Mobile-first design'],
-          risks: ['Payment gateway integration timeline', 'Delivery partner API availability'],
-          budgetRange: '$30,000 - $50,000',
-          timeline: '3 months',
-          rawInput: 'We want to build an e-commerce platform for organic food delivery...',
-        },
-        proposal: null,
         plan: null,
         scopeLog: [],
         activityLog: [
-          { id: 'a6', type: 'analysis', message: 'Requirements analysis completed', agent: 'analyst', timestamp: new Date(Date.now() - 2 * 86400000).toISOString() },
-          { id: 'a7', type: 'created', message: 'Project created', agent: 'orchestrator', timestamp: new Date(Date.now() - 2 * 86400000).toISOString() },
+          { id: 'a1', type: 'created', message: 'Project created', agent: 'orchestrator', timestamp: new Date(Date.now() - 5 * 86400000).toISOString() }
         ],
-      },
+      }
     ];
-
-    data.projects = demoProjects;
-    save(data);
-    return demoProjects;
+    _lsSave(store);
   }
 
   return {
@@ -385,5 +323,6 @@ const Store = (() => {
     clearAll,
     seedDemoData,
     generateId,
+    getApiBase,
   };
 })();

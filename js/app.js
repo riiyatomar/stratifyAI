@@ -22,14 +22,14 @@ function capitalizeFirst(str) {
 }
 
 // App initialization
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   // Seed demo data on first visit
-  Store.seedDemoData();
+  await Store.seedDemoData();
 
   // Render sidebar
   const app = document.getElementById('app');
   app.innerHTML = `
-    ${Sidebar.render()}
+    ${await Sidebar.render()}
     <main class="main-content">
       <div class="page-container" id="page-content"></div>
     </main>

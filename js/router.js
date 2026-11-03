@@ -12,8 +12,13 @@ const Router = (() => {
   }
 
   function navigate(path, params = {}) {
-    currentParams = params;
-    window.location.hash = path;
+    currentParams = { ...params };
+    const targetHash = (params && params.id && !path.includes('/')) ? `${path}/${params.id}` : path;
+    if (window.location.hash === '#' + targetHash) {
+      handleRouteChange();
+    } else {
+      window.location.hash = targetHash;
+    }
   }
 
   function getParams() {

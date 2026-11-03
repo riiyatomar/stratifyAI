@@ -8,9 +8,10 @@
 const ScopePage = (() => {
   let selectedProjectId = null;
 
-  function render(container, params) {
+  async function render(container, params) {
     selectedProjectId = params?.projectId || null;
-    const projects = Store.getProjects().filter(p => p.requirements);
+    const allProjects = await Store.getProjects();
+    const projects = allProjects.filter(p => p.requirements);
 
     container.innerHTML = `
       <div class="page-header">
@@ -72,14 +73,14 @@ Example: Can we add a chatbot for customer support? Also, I'd like the dashboard
     `;
 
     if (selectedProjectId) {
-      renderScopeHistory(selectedProjectId);
+      await renderScopeHistory(selectedProjectId);
     }
 
-    document.getElementById('scope-project')?.addEventListener('change', (e) => {
+    document.getElementById('scope-project')?.addEventListener('change', async (e) => {
       selectedProjectId = e.target.value;
       document.getElementById('scope-results').innerHTML = '';
       if (selectedProjectId) {
-        renderScopeHistory(selectedProjectId);
+        await renderScopeHistory(selectedProjectId);
       } else {
         document.getElementById('scope-history').innerHTML = '';
       }
@@ -112,7 +113,7 @@ Example: Can we add a chatbot for customer support? Also, I'd like the dashboard
 
     if (result.success) {
       renderResults(result);
-      renderScopeHistory(projectId);
+      await renderScopeHistory(projectId);
       document.getElementById('scope-request').value = '';
       Toast.success(`Scope analysis complete: ${result.summary.inScope} in-scope, ${result.summary.outScope} out-of-scope, ${result.summary.vague || 0} vague, ${result.summary.partial} partial`);
     } else {
@@ -355,8 +356,8 @@ Example: Can we add a chatbot for customer support? Also, I'd like the dashboard
   }
 
   // ---- History Renderer ----
-  function renderScopeHistory(projectId) {
-    const project = Store.getProject(projectId);
+  async function renderScopeHistory(projectId) {
+    const project = await Store.getProject(projectId);
     const historyDiv = document.getElementById('scope-history');
     if (!historyDiv || !project) return;
 

@@ -512,7 +512,7 @@ Add multi-language support for English and Spanish.`;
     const planResult = PlannerAgent.generatePlan(requirements, proposalResult.success ? proposalResult.data : null);
 
     // Create the project
-    const project = Store.createProject({
+    const project = await Store.createProject({
       clientName: 'Client',
       company: result.problemUnderstanding.projectType + ' Project',
       email: '',
@@ -521,11 +521,11 @@ Add multi-language support for English and Spanish.`;
       plan: planResult.success ? planResult.data : null,
     });
 
-    Store.updateProject(project.id, {
+    await Store.updateProject(project.id, {
       status: proposalResult.success ? 'proposal' : 'requirements',
     });
 
-    Store.addProjectActivity(project.id, {
+    await Store.addProjectActivity(project.id, {
       type: 'analysis',
       message: `Project created from Consultant analysis: ${result.summary.accepted} features accepted, ${result.summary.rejected} rejected`,
       agent: 'consultant-analyzer',
@@ -535,7 +535,7 @@ Add multi-language support for English and Spanish.`;
     btn.innerHTML = '🚀 Create Project from Analysis';
 
     Toast.success('Project created successfully! Redirecting...');
-    Sidebar.refresh();
+    await Sidebar.refresh();
 
     // Navigate to the project
     setTimeout(() => {

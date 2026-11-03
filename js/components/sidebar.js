@@ -3,8 +3,8 @@
 // ========================================
 
 const Sidebar = (() => {
-  function render() {
-    const stats = Store.getStats();
+  async function render() {
+    const stats = await Store.getStats();
 
     return `
       <aside class="sidebar" id="sidebar">
@@ -90,12 +90,12 @@ const Sidebar = (() => {
     }
   }
 
-  function refresh() {
+  async function refresh() {
     const sidebarElement = document.getElementById('sidebar');
     if (!sidebarElement) return;
 
     // Just update badge counts
-    const stats = Store.getStats();
+    const stats = await Store.getStats();
     const proposalBadge = sidebarElement.querySelector('[data-route="proposals"] .nav-item-badge');
 
     if (stats.pendingProposals > 0) {

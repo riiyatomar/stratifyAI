@@ -3,16 +3,17 @@
 // ========================================
 
 const ProposalsPage = (() => {
-  function render(container, params) {
+  async function render(container, params) {
     if (params?.id) {
-      renderProposalDetail(container, params.id);
+      await renderProposalDetail(container, params.id);
     } else {
-      renderProposalList(container);
+      await renderProposalList(container);
     }
   }
 
-  function renderProposalList(container) {
-    const projects = Store.getProjects().filter(p => p.proposal);
+  async function renderProposalList(container) {
+    const allProjects = await Store.getProjects();
+    const projects = allProjects.filter(p => p.proposal);
 
     container.innerHTML = `
       <div class="page-header">
@@ -72,8 +73,8 @@ const ProposalsPage = (() => {
     `;
   }
 
-  function renderProposalDetail(container, projectId) {
-    const project = Store.getProject(projectId);
+  async function renderProposalDetail(container, projectId) {
+    const project = await Store.getProject(projectId);
     if (!project || !project.proposal) {
       container.innerHTML = `
         <div class="glass-card-static empty-state">
@@ -232,16 +233,16 @@ const ProposalsPage = (() => {
         { label: 'Cancel', class: 'btn-secondary', id: 'status-cancel', onClick: () => Modal.close() },
         {
           label: 'Update Status', class: 'btn-primary', id: 'status-save',
-          onClick: () => {
+          onClick: async () => {
             const selected = document.querySelector('input[name="proposal-status"]:checked')?.value;
             if (selected) {
-              const project = Store.getProject(projectId);
+              const project = await Store.getProject(projectId);
               if (project?.proposal) {
-                Store.updateProject(projectId, {
+                await Store.updateProject(projectId, {
                   proposal: { ...project.proposal, status: selected },
                   ...(selected === 'accepted' ? { status: 'planning' } : {}),
                 });
-                Store.addProjectActivity(projectId, {
+                await Store.addProjectActivity(projectId, {
                   type: 'proposal',
                   message: `Proposal status changed to "${selected}"`,
                   agent: 'consultant',

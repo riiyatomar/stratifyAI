@@ -3,8 +3,8 @@
 // ========================================
 
 const SettingsPage = (() => {
-  function render(container) {
-    const settings = Store.getSettings();
+  async function render(container) {
+    const settings = await Store.getSettings();
 
     container.innerHTML = `
       <div class="page-header">
@@ -60,7 +60,7 @@ const SettingsPage = (() => {
               <div class="settings-label">Auto Save</div>
               <div class="settings-desc">Automatically save changes as you work</div>
             </div>
-            <div class="toggle ${settings.autoSave ? 'active' : ''}" id="toggle-autosave" data-key="autoSave"></div>
+            <div class="toggle ${settings.autoSave === true || settings.autoSave === 'true' ? 'active' : ''}" id="toggle-autosave" data-key="autoSave"></div>
           </div>
 
           <div class="settings-row">
@@ -68,7 +68,7 @@ const SettingsPage = (() => {
               <div class="settings-label">Notifications</div>
               <div class="settings-desc">Show toast notifications for actions</div>
             </div>
-            <div class="toggle ${settings.notifications ? 'active' : ''}" id="toggle-notifications" data-key="notifications"></div>
+            <div class="toggle ${settings.notifications === true || settings.notifications === 'true' ? 'active' : ''}" id="toggle-notifications" data-key="notifications"></div>
           </div>
         </div>
       </div>
@@ -123,7 +123,7 @@ const SettingsPage = (() => {
     });
   }
 
-  function saveSettings() {
+  async function saveSettings() {
     const updates = {
       companyName: document.getElementById('setting-company')?.value || 'Your Company',
       defaultRate: parseInt(document.getElementById('setting-rate')?.value) || 100,
@@ -132,18 +132,20 @@ const SettingsPage = (() => {
       notifications: document.getElementById('toggle-notifications')?.classList.contains('active'),
     };
 
-    Store.updateSettings(updates);
+    await Store.updateSettings(updates);
     Toast.success('Settings saved successfully!');
   }
 
-  function loadDemo() {
-    Store.seedDemoData();
-    Sidebar.refresh();
+  async function loadDemo() {
+    await Store.seedDemoData();
+    await Sidebar.refresh();
     Toast.success('Demo data loaded! Check the Dashboard.');
   }
 
-  function exportData() {
-    const data = Store.getData();
+  async function exportData() {
+    const projects = await Store.getProjects();
+    const settings = await Store.getSettings();
+    const data = { projects, settings };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -160,9 +162,9 @@ const SettingsPage = (() => {
       message: 'This will permanently delete all projects, proposals, and settings. This action cannot be undone.',
       confirmLabel: 'Clear Everything',
       confirmClass: 'btn-danger',
-      onConfirm: () => {
+      onConfirm: async () => {
         Store.clearAll();
-        Sidebar.refresh();
+        await Sidebar.refresh();
         Toast.success('All data cleared.');
         Router.navigate('dashboard');
       },

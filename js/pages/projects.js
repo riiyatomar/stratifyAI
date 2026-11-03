@@ -5,16 +5,16 @@
 const ProjectsPage = (() => {
   let activeView = 'list'; // list | kanban
 
-  function render(container, params) {
+  async function render(container, params) {
     if (params?.id) {
-      renderProjectDetail(container, params.id);
+      await renderProjectDetail(container, params.id);
     } else {
-      renderProjectList(container);
+      await renderProjectList(container);
     }
   }
 
-  function renderProjectList(container) {
-    const projects = Store.getProjects();
+  async function renderProjectList(container) {
+    const projects = await Store.getProjects();
 
     container.innerHTML = `
       <div class="page-header">
@@ -93,8 +93,8 @@ const ProjectsPage = (() => {
     `;
   }
 
-  function renderProjectDetail(container, projectId) {
-    const project = Store.getProject(projectId);
+  async function renderProjectDetail(container, projectId) {
+    const project = await Store.getProject(projectId);
     if (!project) {
       container.innerHTML = `
         <div class="glass-card-static empty-state">
@@ -254,10 +254,10 @@ const ProjectsPage = (() => {
         message: `Are you sure you want to delete the project for <strong>${project.company || project.clientName}</strong>? This action cannot be undone.`,
         confirmLabel: 'Delete',
         confirmClass: 'btn-danger',
-        onConfirm: () => {
-          Store.deleteProject(project.id);
+        onConfirm: async () => {
+          await Store.deleteProject(project.id);
           Toast.success('Project deleted');
-          Sidebar.refresh();
+          await Sidebar.refresh();
           Router.navigate('projects');
         },
       });
@@ -348,8 +348,8 @@ const ProjectsPage = (() => {
     `;
   }
 
-  function toggleTask(projectId, moduleId, taskId, element) {
-    const project = Store.getProject(projectId);
+  async function toggleTask(projectId, moduleId, taskId, element) {
+    const project = await Store.getProject(projectId);
     if (!project?.plan) return;
 
     const module = project.plan.modules.find(m => m.id === moduleId);
@@ -361,7 +361,7 @@ const ProjectsPage = (() => {
     // Toggle
     task.status = task.status === 'done' ? 'todo' : 'done';
 
-    Store.updateProject(projectId, { plan: project.plan });
+    await Store.updateProject(projectId, { plan: project.plan });
 
     // Update UI
     element.classList.toggle('checked');
@@ -383,7 +383,7 @@ const ProjectsPage = (() => {
     }
 
     if (task.status === 'done') {
-      Store.addProjectActivity(projectId, {
+      await Store.addProjectActivity(projectId, {
         type: 'task',
         message: `Task "${task.name}" completed`,
         agent: 'planner',

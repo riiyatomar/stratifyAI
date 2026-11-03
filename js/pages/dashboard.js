@@ -3,10 +3,10 @@
 // ========================================
 
 const DashboardPage = (() => {
-  function render(container) {
-    const stats = Store.getStats();
-    const recentActivity = Store.getRecentActivity(8);
-    const projects = Store.getProjects();
+  async function render(container) {
+    const stats = await Store.getStats();
+    const recentActivity = await Store.getRecentActivity(8);
+    const projects = await Store.getProjects();
 
     container.innerHTML = `
       <div class="page-header">

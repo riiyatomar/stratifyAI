@@ -81,7 +81,7 @@ const Orchestrator = (() => {
     reportProgress(AGENT_NAME, AGENT_ICON, 'complete');
 
     // Create the project
-    const project = Store.createProject({
+    const project = await Store.createProject({
       clientName: clientInfo.clientName,
       company: clientInfo.company,
       email: clientInfo.email,
@@ -91,22 +91,22 @@ const Orchestrator = (() => {
     });
 
     // Update project status
-    Store.updateProject(project.id, { status: 'proposal' });
+    await Store.updateProject(project.id, { status: 'proposal' });
 
     // Add activity entries
-    Store.addProjectActivity(project.id, {
+    await Store.addProjectActivity(project.id, {
       type: 'analysis',
       message: `Requirements analysis completed: ${analysisResult.summary}`,
       agent: 'analyst',
     });
 
-    Store.addProjectActivity(project.id, {
+    await Store.addProjectActivity(project.id, {
       type: 'proposal',
       message: `Proposal generated: ${proposalResult.summary}`,
       agent: 'consultant',
     });
 
-    Store.addProjectActivity(project.id, {
+    await Store.addProjectActivity(project.id, {
       type: 'plan',
       message: `Project plan created: ${planResult.summary}`,
       agent: 'planner',
@@ -139,7 +139,7 @@ const Orchestrator = (() => {
    * Run proposal generation for an existing project
    */
   async function runProposalGeneration(projectId) {
-    const project = Store.getProject(projectId);
+    const project = await Store.getProject(projectId);
     if (!project || !project.requirements) {
       return { success: false, message: 'Project requirements not found.' };
     }
@@ -153,12 +153,12 @@ const Orchestrator = (() => {
     });
 
     if (result.success) {
-      Store.updateProject(projectId, {
+      await Store.updateProject(projectId, {
         proposal: result.data,
         status: 'proposal',
       });
 
-      Store.addProjectActivity(projectId, {
+      await Store.addProjectActivity(projectId, {
         type: 'proposal',
         message: `Proposal generated: ${result.summary}`,
         agent: 'consultant',
@@ -175,7 +175,7 @@ const Orchestrator = (() => {
    * Run plan generation for an existing project
    */
   async function runPlanGeneration(projectId) {
-    const project = Store.getProject(projectId);
+    const project = await Store.getProject(projectId);
     if (!project || !project.requirements) {
       return { success: false, message: 'Project requirements not found.' };
     }
@@ -186,12 +186,12 @@ const Orchestrator = (() => {
     const result = PlannerAgent.generatePlan(project.requirements, project.proposal);
 
     if (result.success) {
-      Store.updateProject(projectId, {
+      await Store.updateProject(projectId, {
         plan: result.data,
         status: project.proposal ? 'planning' : 'requirements',
       });
 
-      Store.addProjectActivity(projectId, {
+      await Store.addProjectActivity(projectId, {
         type: 'plan',
         message: `Project plan created: ${result.summary}`,
         agent: 'planner',
@@ -208,7 +208,7 @@ const Orchestrator = (() => {
    * Run scope evaluation for a new client request
    */
   async function runScopeEvaluation(projectId, newRequest) {
-    const project = Store.getProject(projectId);
+    const project = await Store.getProject(projectId);
     if (!project) {
       return { success: false, message: 'Project not found.' };
     }
@@ -220,8 +220,8 @@ const Orchestrator = (() => {
 
     if (result.success) {
       // Log each result to the scope log
-      result.results.forEach(item => {
-        Store.addScopeEntry(projectId, {
+      for (const item of result.results) {
+        await Store.addScopeEntry(projectId, {
           request: item.request,
           type: item.type,
           classification: item.classification,
@@ -229,9 +229,9 @@ const Orchestrator = (() => {
           impact: item.impact,
           matchConfidence: item.matchConfidence,
         });
-      });
+      }
 
-      Store.addProjectActivity(projectId, {
+      await Store.addProjectActivity(projectId, {
         type: 'scope',
         message: `Scope evaluation: ${result.summary.inScope} in-scope, ${result.summary.outScope} out-of-scope, ${result.summary.vague || 0} vague, ${result.summary.partial} needs discussion`,
         agent: 'auditor',
