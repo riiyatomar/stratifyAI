@@ -103,18 +103,18 @@ const NewProjectPage = (() => {
               <div class="wizard-row">
                 <div class="input-group">
                   <label for="client-name">Client Name *</label>
-                  <input type="text" class="input-field" id="client-name" placeholder="e.g., John Smith"
+                  <input type="text" class="input-field" id="client-name" placeholder="Enter the name"
                     value="${formData.clientName}">
                 </div>
                 <div class="input-group">
                   <label for="company-name">Company Name *</label>
-                  <input type="text" class="input-field" id="company-name" placeholder="e.g., Acme Corp"
+                  <input type="text" class="input-field" id="company-name" placeholder="Enter the company name"
                     value="${formData.company}">
                 </div>
               </div>
               <div class="input-group">
                 <label for="client-email">Email Address</label>
-                <input type="email" class="input-field" id="client-email" placeholder="e.g., john@acme.com"
+                <input type="email" class="input-field" id="client-email" placeholder="Enter the email"
                   value="${formData.email}">
               </div>
             </div>
@@ -132,9 +132,7 @@ const NewProjectPage = (() => {
               <div class="input-group">
                 <label for="raw-description">Project Description *</label>
                 <textarea class="input-field" id="raw-description" rows="8"
-                  placeholder="Describe the project goals, features needed, target users, technical requirements, and any constraints. The more detail you provide, the better the AI analysis will be.
-
-Example: We need a customer portal where users can manage their subscriptions, view invoices, track support tickets, and access a knowledge base. The platform should support SSO authentication, have role-based access for admins and customers, and integrate with our existing Stripe billing system. It must be mobile responsive and comply with GDPR."
+                  placeholder="Tell us about your project in your own words. What are you looking to build, who is it for, and what key features or constraints do you have in mind?"
                 >${formData.rawDescription}</textarea>
               </div>
               <div style="display: flex; justify-content: flex-end; margin-top: var(--space-2);">
