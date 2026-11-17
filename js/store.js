@@ -5,9 +5,11 @@
 // Falls back to localStorage when the backend is unreachable.
 
 const Store = (() => {
-  // Configurable backend base: can be set via window.STRATIFY_API_URL or localStorage
+  // Configurable backend base: auto-detects localhost vs live Render backend
   function getApiBase() {
-    return window.STRATIFY_API_URL || localStorage.getItem('stratify_api_url') || '/api';
+    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    const liveRenderBackend = 'https://stratify-backened.onrender.com/api';
+    return window.STRATIFY_API_URL || localStorage.getItem('stratify_api_url') || (isLocal ? '/api' : liveRenderBackend);
   }
 
   const STORAGE_KEY = 'stratify_ai_data';
