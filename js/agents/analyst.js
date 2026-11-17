@@ -378,7 +378,7 @@ const AnalystAgent = (() => {
     }
 
     // Hybrid cost calculation
-    const settings = (typeof Store !== 'undefined' && Store.getSettings) ? Store.getSettings() : { defaultRate: 100 };
+    const settings = (typeof Store !== 'undefined' && Store.getSettings) ? (() => { try { const raw = localStorage.getItem('stratify_store'); const parsed = raw ? JSON.parse(raw) : {}; return parsed.settings || { defaultRate: 100 }; } catch(e) { return { defaultRate: 100 }; } })() : { defaultRate: 100 };
     const hourlyRate = settings.defaultRate || 100;
 
     // Estimate hours per feature using complexity heuristics

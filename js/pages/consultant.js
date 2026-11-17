@@ -46,10 +46,7 @@ We want it within 2 months.
 Maybe add AI-powered recommendations."></textarea>
           </div>
 
-          <div style="display: flex; justify-content: space-between; align-items: center;">
-            <button class="btn btn-secondary btn-sm" id="consultant-load-sample" style="gap: var(--space-2);">
-              📋 Load Sample Brief
-            </button>
+          <div style="display: flex; justify-content: flex-end; align-items: center;">
             <button class="btn btn-primary" id="consultant-analyze-btn">
               🎯 Analyze Brief
             </button>
@@ -63,27 +60,6 @@ Maybe add AI-powered recommendations."></textarea>
 
     // Events
     document.getElementById('consultant-analyze-btn')?.addEventListener('click', runAnalysis);
-    document.getElementById('consultant-load-sample')?.addEventListener('click', loadSampleBrief);
-  }
-
-  function loadSampleBrief() {
-    const sample = `We need an e-commerce platform for selling organic products online.
-User registration and login with social media options.
-Product catalog with categories, search, and filters.
-Shopping cart and secure payment gateway integration with Stripe.
-Order tracking and delivery status notifications.
-Admin dashboard with sales analytics and inventory management.
-The budget is around $40,000.
-It should look modern and professional.
-Can you also build us a native mobile app for iOS and Android?
-Maybe add an AI chatbot for customer support.
-Customer reviews and ratings for products.
-We want to launch within 3 months.
-The website must be GDPR compliant.
-Add multi-language support for English and Spanish.`;
-
-    document.getElementById('consultant-brief').value = sample;
-    Toast.success('Sample brief loaded. Click "Analyze Brief" to proceed.');
   }
 
   async function runAnalysis() {

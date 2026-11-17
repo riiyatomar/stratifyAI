@@ -243,16 +243,3 @@ def add_scope_entry(project_id: str, body: ScopeLogCreate, db: Session = Depends
     }
 
 
-# ---- Seed Demo Data ----
-
-@router.post("/seed", status_code=201)
-def seed_demo_data(db: Session = Depends(get_db)):
-    """Seed the database with demo projects (skips if data exists)."""
-    existing = db.query(Project).count()
-    if existing > 0:
-        return {"message": "Data already exists, skipping seed.", "count": existing}
-
-    from app.seed import seed_database
-    seed_database(db)
-    return {"message": "Demo data seeded successfully."}
-

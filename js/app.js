@@ -23,9 +23,6 @@ function capitalizeFirst(str) {
 
 // App initialization
 document.addEventListener('DOMContentLoaded', async () => {
-  // Seed demo data on first visit
-  await Store.seedDemoData();
-
   // Render sidebar
   const app = document.getElementById('app');
   app.innerHTML = `

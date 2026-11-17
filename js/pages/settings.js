@@ -79,14 +79,6 @@ const SettingsPage = (() => {
         <div class="settings-group">
           <div class="settings-row">
             <div class="settings-label-group">
-              <div class="settings-label">Load Demo Data</div>
-              <div class="settings-desc">Pre-load sample projects to explore the system</div>
-            </div>
-            <button class="btn btn-secondary" id="load-demo">📦 Load Demo Data</button>
-          </div>
-
-          <div class="settings-row">
-            <div class="settings-label-group">
               <div class="settings-label">Export Data</div>
               <div class="settings-desc">Download all projects as JSON</div>
             </div>
@@ -111,7 +103,6 @@ const SettingsPage = (() => {
 
     // Events
     document.getElementById('save-settings')?.addEventListener('click', saveSettings);
-    document.getElementById('load-demo')?.addEventListener('click', loadDemo);
     document.getElementById('export-data')?.addEventListener('click', exportData);
     document.getElementById('clear-data')?.addEventListener('click', clearData);
 
@@ -134,12 +125,6 @@ const SettingsPage = (() => {
 
     await Store.updateSettings(updates);
     Toast.success('Settings saved successfully!');
-  }
-
-  async function loadDemo() {
-    await Store.seedDemoData();
-    await Sidebar.refresh();
-    Toast.success('Demo data loaded! Check the Dashboard.');
   }
 
   async function exportData() {

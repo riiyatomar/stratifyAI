@@ -253,61 +253,7 @@ const Store = (() => {
     localStorage.removeItem(STORAGE_KEY);
   }
 
-  async function seedDemoData() {
-    if (_useApi) {
-      const data = await apiFetch('/projects/seed', { method: 'POST' });
-      if (data) return;
-    }
-    // localStorage demo data fallback
-    const store = _lsLoad();
-    if (store.projects && store.projects.length > 0) return;
-
-    store.projects = [
-      {
-        id: 'demo_1',
-        status: 'active',
-        clientName: 'Marcus Chen',
-        company: 'NovaTech Solutions',
-        email: 'marcus@novatech.io',
-        createdAt: new Date(Date.now() - 5 * 86400000).toISOString(),
-        updatedAt: new Date(Date.now() - 86400000).toISOString(),
-        requirements: {
-          objective: 'Build an employee management portal with real-time analytics dashboard, role-based access, and automated reporting',
-          features: [
-            'Employee onboarding workflow',
-            'Real-time analytics dashboard',
-            'Role-based access control (RBAC)',
-            'Automated monthly reports',
-            'Leave management system',
-            'Performance review module',
-          ],
-          userTypes: ['Admin', 'HR Manager', 'Employee', 'Department Head'],
-          constraints: ['Must integrate with existing SAP system', 'GDPR compliance required', 'Support 500+ concurrent users'],
-          risks: ['SAP integration complexity', 'Data migration from legacy system'],
-          budgetRange: '$50,000 - $80,000',
-          timeline: '4-6 months',
-          rawInput: 'We need an employee management portal...',
-        },
-        proposal: {
-          problemStatement: 'NovaTech Solutions currently relies on disparate spreadsheets and manual processes for employee management, leading to inefficiencies and compliance risks.',
-          solution: 'We propose building a modern, cloud-based Employee Management Portal that centralizes all HR operations.',
-          features: [
-            { name: 'Employee Onboarding Workflow', description: 'Automated onboarding process with document collection', priority: 'High', complexity: 'Medium', estimate: '3 weeks' },
-            { name: 'Real-time Analytics Dashboard', description: 'Interactive dashboard with KPIs', priority: 'High', complexity: 'High', estimate: '4 weeks' },
-          ],
-          timeline: [{ phase: 'Core Development', duration: '8 weeks', color: '#7c3aed' }],
-          costEstimate: { min: 55000, max: 75000, currency: 'USD' },
-          status: 'sent',
-        },
-        plan: null,
-        scopeLog: [],
-        activityLog: [
-          { id: 'a1', type: 'created', message: 'Project created', agent: 'orchestrator', timestamp: new Date(Date.now() - 5 * 86400000).toISOString() }
-        ],
-      }
-    ];
-    _lsSave(store);
-  }
+  // seedDemoData removed — no auto-populated demo data
 
   return {
     getData,
@@ -323,7 +269,6 @@ const Store = (() => {
     getStats,
     getRecentActivity,
     clearAll,
-    seedDemoData,
     generateId,
     getApiBase,
   };
