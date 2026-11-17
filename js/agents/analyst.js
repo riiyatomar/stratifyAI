@@ -34,6 +34,8 @@ const AnalystAgent = (() => {
     /^(just|simply)\s+/i,
     /^I\s+(want|need)\s+(it\s+)?(to\s+be\s+)?(good|nice|great|better|fast|modern|cool|awesome)/i,
     /^(good|nice|great|fast|modern|cool|awesome|beautiful|sleek|clean)\s*$/i,
+    /\bshould\s+(look|be|feel)\s+(modern|professional|beautiful|nice|good|clean|sleek|fast|great|cool)/i,
+    /\b(look|looks|looking)\s+(modern|professional|beautiful|nice|good|clean|sleek|great|cool)/i,
   ];
 
   const VAGUE_ADJECTIVES = [
@@ -51,13 +53,21 @@ const AnalystAgent = (() => {
   ];
 
   const CONSTRAINT_KEYWORDS = [
-    'budget', 'cost', 'price', 'afford', 'spend', 'pay',
-    'deadline', 'timeline', 'by next', 'within', 'before',
-    'weeks', 'months', 'days', 'asap', 'urgent', 'hurry',
-    'limit', 'max', 'maximum', 'minimum', 'at least', 'at most',
+    'budget', 'cost', 'price', 'afford', 'spend',
+    'deadline', 'timeline', 'by next', 'within',
+    'asap', 'urgent', 'hurry',
+    'at least', 'at most',
     'must be done', 'need it by', 'cannot exceed', 'no more than',
     'gdpr', 'hipaa', 'pci', 'compliance', 'regulation', 'legal',
-    'only', 'restrict', 'cannot', 'must not', 'should not',
+    'restrict', 'cannot', 'must not', 'should not',
+  ];
+
+  // Word-boundary constraint patterns (avoid false positives like "payment" matching "pay")
+  const CONSTRAINT_PATTERNS = [
+    /\bpay\b/i, /\bbefore\b/i, /\blimit\b/i,
+    /\bmaximum\b/i, /\bminimum\b/i, /\bmax\b/i,
+    /\bonly\s+(if|when|allow|permit)\b/i,
+    /\bmonths?\b/i, /\bweeks?\b/i, /\bdays?\b/i,
   ];
 
   const SCOPE_EXPANSION_SIGNALS = [
@@ -242,7 +252,7 @@ const AnalystAgent = (() => {
     // Entirely adjective-based (no actionable nouns/verbs)
     const words = lower.split(/\s+/).filter(w => w.length > 2);
     const vagueWordCount = words.filter(w => VAGUE_ADJECTIVES.includes(w)).length;
-    if (words.length > 0 && vagueWordCount / words.length >= 0.6) return true;
+    if (words.length > 0 && vagueWordCount / words.length >= 0.4) return true;
 
     // Question format without specifics
     if (/^(can|could|would|should|what if)\s+(you|we|they|it)/i.test(lower) && lower.length < 40) {
@@ -269,7 +279,18 @@ const AnalystAgent = (() => {
 
   // ---- Constraint Detection ----
   function isConstraint(lower) {
-    return CONSTRAINT_KEYWORDS.some(kw => lower.includes(kw));
+    // Check exact substring keywords first
+    if (CONSTRAINT_KEYWORDS.some(kw => lower.includes(kw))) return true;
+    // Check word-boundary patterns (avoid "payment" matching "pay", etc.)
+    if (CONSTRAINT_PATTERNS.some(pat => pat.test(lower))) {
+      // Extra guard: if the statement has an actionable verb and is describing
+      // a feature (e.g. "Add a payment gateway"), it's NOT a constraint
+      const hasAction = ACTIONABLE_VERBS.some(v => lower.includes(v));
+      const isFeatureLike = /\b(add|build|create|implement|integrate|develop|design|include|enable|display|show)\b/i.test(lower);
+      if (isFeatureLike) return false;
+      return true;
+    }
+    return false;
   }
 
   function getConstraintReason(text) {
@@ -282,16 +303,10 @@ const AnalystAgent = (() => {
 
   // ---- Scope Change Detection ----
   function isScopeChange(lower, existingRequirements) {
-    // Always flag expansion signals as scope change
+    // Only flag explicit expansion signals as scope change
+    // (e.g., "chatbot", "mobile app", "blockchain", "AI", etc.)
+    // Nuanced scope matching is handled by AuditorAgent.deepEvaluate()
     if (SCOPE_EXPANSION_SIGNALS.some(sig => lower.includes(sig))) return true;
-
-    // If we have existing requirements, check if this is entirely unrelated
-    if (existingRequirements) {
-      const scopeTerms = getAllScopeTerms(existingRequirements);
-      const similarity = calculateMaxSimilarity(lower, scopeTerms);
-      // Very low similarity + long enough to be a real request = scope change
-      if (similarity < 0.1 && lower.length > 30) return true;
-    }
 
     return false;
   }
